@@ -66,7 +66,7 @@ export class GeminiService {
   /**
    * Generate questions based on user profile and job description
    */
-  async generateQuestions(userProfile: UserProfile, jobDescription: JobDescription): Promise<AIQuestion[]> {
+  async generateQuestions(userProfile: UserProfile, jobDescription: JobDescription, promptOverride?: string): Promise<AIQuestion[]> {
     // First test the connection
     const testResult = await this.testConnection();
     if (!testResult.success) {
@@ -74,7 +74,7 @@ export class GeminiService {
       return this.getFallbackQuestions(userProfile, jobDescription);
     }
 
-    const prompt = `
+    const prompt = promptOverride || `
 You are an expert resume writer and career coach. Analyze the following user profile and job description to generate relevant questions that will help create a targeted resume.
 
 User Profile:

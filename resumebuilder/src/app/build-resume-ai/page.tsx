@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, 
@@ -21,7 +21,6 @@ import {
 import Link from 'next/link';
 import TemplateSelector from '@/components/TemplateSelector';
 import dynamic from 'next/dynamic';
-import { useRef, useEffect } from 'react';
 
 interface JobDescription {
   title: string;
@@ -33,10 +32,11 @@ interface JobDescription {
 
 interface AIQuestion {
   question: string;
-  input_type: 'text' | 'textarea' | 'select' | 'multiselect';
+  input_type: 'text' | 'textarea' | 'select' | 'multiselect' | 'checkbox';
   options?: string[];
   required: boolean;
   category: string;
+  can_add_more?: boolean;
 }
 
 interface UserProfile {
@@ -93,6 +93,9 @@ export default function BuildResumeAI() {
   const [latexCode, setLatexCode] = useState<string>('');
   const [compileError, setCompileError] = useState<string | null>(null);
   const compileTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [customOptions, setCustomOptions] = useState<Record<number, string[]>>({});
+  const [customInput, setCustomInput] = useState<Record<number, string>>({});
 
   // After resume is generated, set LaTeX code
   useEffect(() => {
@@ -251,72 +254,124 @@ export default function BuildResumeAI() {
     }));
   };
 
+  const handleAddCustomOption = (index: number, newOption: string) => {
+    setCustomOptions(prev => ({
+      ...prev,
+      [index]: [...(prev[index] || []), newOption]
+    }));
+    setQuestions(prev => prev.map((q, i) =>
+      i === index ? { ...q, options: [...(q.options || []), newOption] } : q
+    ));
+    setCustomInput(prev => ({ ...prev, [index]: '' }));
+  };
+
   const renderQuestion = (question: AIQuestion, index: number) => {
     const value = answers[index.toString()] || '';
-
-    switch (question.input_type) {
-      case 'textarea':
-        return (
-          <textarea
-            value={value}
-            onChange={(e) => handleInputChange(index, e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            rows={4}
-            placeholder="Enter your answer..."
-            required={question.required}
-          />
-        );
-
-      case 'select':
-        return (
-          <select
-            value={value}
-            onChange={(e) => handleInputChange(index, e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required={question.required}
-          >
-            <option value="">Select an option...</option>
-            {question.options?.map((option, i) => (
-              <option key={i} value={option}>{option}</option>
-            ))}
-          </select>
-        );
-
-      case 'multiselect':
-        const selectedValues = value ? value.split(',') : [];
-        return (
-          <div className="space-y-2">
-            {question.options?.map((option, i) => (
-              <label key={i} className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={selectedValues.includes(option)}
-                  onChange={(e) => {
-                    const newValues = e.target.checked
-                      ? [...selectedValues, option]
-                      : selectedValues.filter(v => v !== option);
-                    handleInputChange(index, newValues.join(','));
-                  }}
-                  className="mr-2"
+    if (index !== currentQuestion) return null;
+    return (
+      <div>
+        <label className="block text-lg font-medium text-gray-900 mb-3">
+          {question.question}
+          {question.required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        {(() => {
+          switch (question.input_type) {
+            case 'textarea':
+              return (
+                <textarea
+                  value={value}
+                  onChange={(e) => handleInputChange(index, e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={4}
+                  placeholder="Enter your answer..."
+                  required={question.required}
                 />
-                {option}
-              </label>
-            ))}
+              );
+            case 'select':
+              return (
+                <select
+                  value={value}
+                  onChange={(e) => handleInputChange(index, e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required={question.required}
+                >
+                  <option value="">Select an option...</option>
+                  {question.options?.map((option, i) => (
+                    <option key={i} value={option}>{option}</option>
+                  ))}
+                  {(customOptions[index] || []).map((option, i) => (
+                    <option key={`custom-${i}`} value={option}>{option}</option>
+                  ))}
+                </select>
+              );
+            case 'multiselect':
+            case 'checkbox': {
+              const selectedValues = value ? value.split(',') : [];
+              const allOptions = [...(question.options || []), ...(customOptions[index] || [])];
+              return (
+                <div className="space-y-2">
+                  {allOptions.map((option, i) => (
+                    <label key={i} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedValues.includes(option)}
+                        onChange={(e) => {
+                          const newValues = e.target.checked
+                            ? [...selectedValues, option]
+                            : selectedValues.filter(v => v !== option);
+                          handleInputChange(index, newValues.join(','));
+                        }}
+                        className="mr-2"
+                      />
+                      {option}
+                    </label>
+                  ))}
+                  {question.can_add_more && (
+                    <div className="flex mt-2">
+                      <input
+                        type="text"
+                        placeholder="Add another..."
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded-l"
+                        value={customInput[index] || ''}
+                        onChange={e => setCustomInput(prev => ({ ...prev, [index]: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        className="px-3 py-1 bg-blue-600 text-white rounded-r"
+                        onClick={() => {
+                          const input = customInput[index] || '';
+                          if (input.trim()) {
+                            handleAddCustomOption(index, input.trim());
+                          }
+                        }}
+                      >Add</button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            default:
+              return (
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) => handleInputChange(index, e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter your answer..."
+                  required={question.required}
+                />
+              );
+          }
+        })()}
+        {question.category && (
+          <div className="mt-2">
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              {question.category}
+            </span>
           </div>
-        );
-
-      default:
-        return (
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => handleInputChange(index, e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter your answer..."
-            required={question.required}
-          />
-        );
-    }
+        )}
+      </div>
+    );
   };
 
   return (
@@ -635,52 +690,19 @@ export default function BuildResumeAI() {
                 </p>
               </div>
 
-              <form onSubmit={handleAnswersSubmit} className="space-y-6">
-                {questions.map((question, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-6">
-                    <label className="block text-sm font-medium text-gray-900 mb-3">
-                      {question.question}
-                      {question.required && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    {renderQuestion(question, index)}
-                    <div className="mt-2">
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        {question.category}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-
-                <div className="flex justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isCompiling}
-                    className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isCompiling ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating Resume...
-                      </>
+              {questions.length > 0 && (
+                <form onSubmit={handleAnswersSubmit} className="space-y-6">
+                  {renderQuestion(questions[currentQuestion], currentQuestion)}
+                  <div className="flex justify-between mt-6">
+                    <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(q => q - 1)} className="px-4 py-2 bg-gray-200 rounded">Previous</button>
+                    {currentQuestion < questions.length - 1 ? (
+                      <button type="button" onClick={() => setCurrentQuestion(q => q + 1)} className="px-4 py-2 bg-blue-600 text-white rounded">Next</button>
                     ) : (
-                      <>
-                        <Zap className="w-4 h-4 mr-2" />
-                        Generate Resume
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </>
+                      <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded">Submit</button>
                     )}
-                  </button>
-                </div>
-              </form>
+                  </div>
+                </form>
+              )}
             </motion.div>
           )}
 
