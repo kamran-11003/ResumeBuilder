@@ -25,6 +25,23 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+interface Certificate {
+  id: string;
+  name: string;
+  issuer: string;
+  issueDate: string;
+  expiryDate?: string;
+  credentialId?: string;
+  url?: string;
+  description?: string;
+}
+
+interface Language {
+  id: string;
+  name: string;
+  proficiency: 'basic' | 'conversational' | 'fluent' | 'native';
+}
+
 interface UserProfile {
   personalInfo: {
     firstName: string;
@@ -67,6 +84,8 @@ interface UserProfile {
     level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
     category: string;
   }>;
+  certificates: Certificate[];
+  languages: Language[];
 }
 
 export default function ProfilePage() {
@@ -87,7 +106,9 @@ export default function ProfilePage() {
     },
     experience: [],
     education: [],
-    skills: []
+    skills: [],
+    certificates: [],
+    languages: []
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -95,8 +116,39 @@ export default function ProfilePage() {
   const [linkedinData, setLinkedinData] = useState<any>(null);
 
   useEffect(() => {
-    // Load user profile from session/storage
-    loadProfile();
+    // Fetch user profile from API
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch('/api/profile');
+        if (res.ok) {
+          const data = await res.json();
+          setProfile({
+            personalInfo: data.personalInfo || {
+              firstName: '',
+              lastName: '',
+              title: '',
+              summary: '',
+              contactInfo: {
+                email: '',
+                phone: '',
+                location: '',
+                linkedin: '',
+                github: '',
+                website: ''
+              }
+            },
+            experience: Array.isArray(data.workExperience) ? data.workExperience : [],
+            education: Array.isArray(data.education) ? data.education : [],
+            skills: Array.isArray(data.skills) ? data.skills : [],
+            certificates: Array.isArray(data.certifications) ? data.certifications : [],
+            languages: Array.isArray(data.languages) ? data.languages : [],
+          });
+        }
+      } catch (err) {
+        // handle error
+      }
+    };
+    fetchProfile();
   }, []);
 
   const loadProfile = async () => {
@@ -149,7 +201,9 @@ export default function ProfilePage() {
         { id: '1', name: 'JavaScript', level: 'expert', category: 'Programming' },
         { id: '2', name: 'React', level: 'advanced', category: 'Frontend' },
         { id: '3', name: 'Node.js', level: 'advanced', category: 'Backend' }
-      ]
+      ],
+      certificates: [],
+      languages: []
     };
     setProfile(mockProfile);
   };
@@ -202,9 +256,12 @@ export default function ProfilePage() {
   const saveProfile = async () => {
     setIsLoading(true);
     try {
-      // In a real app, this would save to API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIsEditing(false);
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      });
+      if (res.ok) setIsEditing(false);
     } catch (error) {
       console.error('Error saving profile:', error);
     } finally {
@@ -248,29 +305,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center">
-              <FileText className="w-8 h-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">ResumeBuilder</span>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/build-resume-ai" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Build Resume
-              </Link>
-              <Link href="/cover-letter" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Cover Letter
-              </Link>
-              <Link href="/ats-checker" className="text-gray-600 hover:text-blue-600 transition-colors">
-                ATS Checker
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -334,7 +368,7 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
                 <input
                   type="text"
-                  value={profile.personalInfo.firstName}
+                  value={profile.personalInfo.firstName || ''}
                   onChange={(e) => setProfile(prev => ({
                     ...prev,
                     personalInfo: { ...prev.personalInfo, firstName: e.target.value }
@@ -347,7 +381,7 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
                 <input
                   type="text"
-                  value={profile.personalInfo.lastName}
+                  value={profile.personalInfo.lastName || ''}
                   onChange={(e) => setProfile(prev => ({
                     ...prev,
                     personalInfo: { ...prev.personalInfo, lastName: e.target.value }
@@ -360,7 +394,7 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Professional Title</label>
                 <input
                   type="text"
-                  value={profile.personalInfo.title}
+                  value={profile.personalInfo.title || ''}
                   onChange={(e) => setProfile(prev => ({
                     ...prev,
                     personalInfo: { ...prev.personalInfo, title: e.target.value }
@@ -372,7 +406,7 @@ export default function ProfilePage() {
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Professional Summary</label>
                 <textarea
-                  value={profile.personalInfo.summary}
+                  value={profile.personalInfo.summary || ''}
                   onChange={(e) => setProfile(prev => ({
                     ...prev,
                     personalInfo: { ...prev.personalInfo, summary: e.target.value }
@@ -394,7 +428,7 @@ export default function ProfilePage() {
                     <Mail className="w-4 h-4 text-gray-400 mt-3 mr-2" />
                     <input
                       type="email"
-                      value={profile.personalInfo.contactInfo.email}
+                      value={profile.personalInfo.contactInfo.email || ''}
                       onChange={(e) => setProfile(prev => ({
                         ...prev,
                         personalInfo: {
@@ -413,7 +447,7 @@ export default function ProfilePage() {
                     <Phone className="w-4 h-4 text-gray-400 mt-3 mr-2" />
                     <input
                       type="tel"
-                      value={profile.personalInfo.contactInfo.phone}
+                      value={profile.personalInfo.contactInfo.phone || ''}
                       onChange={(e) => setProfile(prev => ({
                         ...prev,
                         personalInfo: {
@@ -432,7 +466,7 @@ export default function ProfilePage() {
                     <MapPin className="w-4 h-4 text-gray-400 mt-3 mr-2" />
                     <input
                       type="text"
-                      value={profile.personalInfo.contactInfo.location}
+                      value={profile.personalInfo.contactInfo.location || ''}
                       onChange={(e) => setProfile(prev => ({
                         ...prev,
                         personalInfo: {
@@ -451,7 +485,7 @@ export default function ProfilePage() {
                     <Globe className="w-4 h-4 text-gray-400 mt-3 mr-2" />
                     <input
                       type="url"
-                      value={profile.personalInfo.contactInfo.website}
+                      value={profile.personalInfo.contactInfo.website || ''}
                       onChange={(e) => setProfile(prev => ({
                         ...prev,
                         personalInfo: {
@@ -470,7 +504,7 @@ export default function ProfilePage() {
                     <Linkedin className="w-4 h-4 text-gray-400 mt-3 mr-2" />
                     <input
                       type="url"
-                      value={profile.personalInfo.contactInfo.linkedin}
+                      value={profile.personalInfo.contactInfo.linkedin || ''}
                       onChange={(e) => setProfile(prev => ({
                         ...prev,
                         personalInfo: {
@@ -489,7 +523,7 @@ export default function ProfilePage() {
                     <Github className="w-4 h-4 text-gray-400 mt-3 mr-2" />
                     <input
                       type="url"
-                      value={profile.personalInfo.contactInfo.github}
+                      value={profile.personalInfo.contactInfo.github || ''}
                       onChange={(e) => setProfile(prev => ({
                         ...prev,
                         personalInfo: {
@@ -544,7 +578,7 @@ export default function ProfilePage() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Company</label>
                       <input
                         type="text"
-                        value={exp.company}
+                        value={exp.company || ''}
                         onChange={(e) => updateExperience(exp.id, 'company', e.target.value)}
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
@@ -554,7 +588,7 @@ export default function ProfilePage() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
                       <input
                         type="text"
-                        value={exp.location}
+                        value={exp.location || ''}
                         onChange={(e) => updateExperience(exp.id, 'location', e.target.value)}
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
@@ -564,7 +598,7 @@ export default function ProfilePage() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
                       <input
                         type="month"
-                        value={exp.startDate}
+                        value={exp.startDate || ''}
                         onChange={(e) => updateExperience(exp.id, 'startDate', e.target.value)}
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
@@ -574,7 +608,7 @@ export default function ProfilePage() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
                       <input
                         type="month"
-                        value={exp.endDate}
+                        value={exp.endDate || ''}
                         onChange={(e) => updateExperience(exp.id, 'endDate', e.target.value)}
                         disabled={!isEditing || exp.current}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
@@ -585,7 +619,7 @@ export default function ProfilePage() {
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                     <textarea
-                      value={exp.description}
+                      value={exp.description || ''}
                       onChange={(e) => updateExperience(exp.id, 'description', e.target.value)}
                       disabled={!isEditing}
                       rows={3}

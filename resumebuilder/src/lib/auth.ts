@@ -2,8 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import LinkedInProvider from "next-auth/providers/linkedin";
-import { MongoDBAdapter } from "@auth/mongodb-adapter";
-import clientPromise from "./mongodb";
+import { CustomAdapter } from './CustomAdapter';
 
 // Extend NextAuth types
 declare module "next-auth" {
@@ -30,7 +29,7 @@ declare module "next-auth/jwt" {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: MongoDBAdapter(clientPromise),
+  adapter: CustomAdapter(),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,

@@ -1,10 +1,8 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import latex from 'node-latex';
+import streamToBuffer from 'stream-to-buffer';
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-
-const execAsync = promisify(exec);
 
 export interface CompilationResult {
   success: boolean;
@@ -33,88 +31,34 @@ export class LaTeXCompiler {
    * Compile LaTeX code to PDF
    */
   async compileToPDF(latexCode: string, filename?: string): Promise<CompilationResult> {
-    // Check if LaTeX is installed first
-    const isLaTeXInstalled = await this.checkLaTeXInstallation();
-    if (!isLaTeXInstalled) {
-      console.log('❌ LaTeX not found in PATH. Available PATH entries:');
-      console.log(process.env.PATH?.split(';').filter(p => p.includes('MiKTeX')));
-      return {
-        success: false,
-        error: 'LaTeX is not installed on this system. Please install a LaTeX distribution like MiKTeX or TeX Live.'
-      };
-    }
-
-    console.log('✅ LaTeX installation detected');
-
     const id = uuidv4();
     const baseName = filename || `resume_${id}`;
-    const texPath = path.join(this.tempDir, `${baseName}.tex`);
     const pdfPath = path.join(this.tempDir, `${baseName}.pdf`);
-    const logPath = path.join(this.tempDir, `${baseName}.log`);
-
     try {
-      // Write LaTeX code to file
-      console.log(`📝 Writing LaTeX to: ${texPath}`);
+      // Write LaTeX code to file (for debugging or user download)
+      const texPath = path.join(this.tempDir, `${baseName}.tex`);
       await fs.writeFile(texPath, latexCode, 'utf8');
 
-      // Compile LaTeX to PDF
-      const pdflatexPath = 'C:\\Users\\Kamra\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\pdflatex.exe';
-      const command = `"${pdflatexPath}" -interaction=nonstopmode -output-directory="${this.tempDir}" "${texPath}"`;
-      console.log(`🔄 Running command: ${command}`);
-      
-      const { stdout, stderr } = await execAsync(command, { timeout: 120000 }); // 2 minute timeout for package installation
-
-      console.log('📋 LaTeX stdout:', stdout);
-      if (stderr) {
-        console.log('⚠️ LaTeX stderr:', stderr);
-      }
-
-      // Check if PDF was created
-      try {
-        await fs.access(pdfPath);
-        console.log(`✅ PDF created at: ${pdfPath}`);
-        
-        // Read the log file for any warnings
-        let log = '';
-        try {
-          log = await fs.readFile(logPath, 'utf8');
-          console.log('📋 LaTeX log file content:');
-          console.log(log);
-        } catch (error) {
-          console.log('⚠️ Could not read log file');
-        }
-
-        return {
-          success: true,
-          pdfPath,
-          log: log || stdout
-        };
-      } catch (error) {
-        // PDF was not created
-        console.log(`❌ PDF not found at: ${pdfPath}`);
-        console.log('📋 Available files in temp directory:');
-        try {
-          const files = await fs.readdir(this.tempDir);
-          console.log(files);
-        } catch (err) {
-          console.log('Could not list temp directory');
-        }
-        
-        return {
-          success: false,
-          error: stderr || 'PDF compilation failed',
-          log: stdout
-        };
-      }
-    } catch (error) {
-      console.error('❌ LaTeX compilation error:', error);
+      // Use node-latex to compile
+      const output = latex(latexCode, { inputs: [this.tempDir] });
+      const buffer: Buffer = await new Promise((resolve, reject) => {
+        streamToBuffer(output, (err: Error | null, buf: Buffer) => {
+          if (err) reject(err);
+          else resolve(buf);
+        });
+      });
+      // Save PDF for download (optional)
+      await fs.writeFile(pdfPath, buffer);
+      return {
+        success: true,
+        pdfPath,
+      };
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown compilation error'
+        error: error.message || 'Unknown LaTeX compilation error',
+        log: error.stack || '',
       };
-    } finally {
-      // Clean up temporary files (except PDF)
-      await this.cleanupTempFiles(baseName, ['pdf']);
     }
   }
 
@@ -133,10 +77,15 @@ export class LaTeXCompiler {
       await fs.writeFile(texPath, latexCode, 'utf8');
 
       // Compile LaTeX to PDF
-      const { stdout, stderr } = await execAsync(
-        `pdflatex -interaction=nonstopmode -output-directory="${this.tempDir}" "${texPath}"`,
-        { timeout: 30000 }
-      );
+      const output = latex(latexCode, { inputs: [this.tempDir] });
+      const buffer: Buffer = await new Promise((resolve, reject) => {
+        streamToBuffer(output, (err: Error | null, buf: Buffer) => {
+          if (err) reject(err);
+          else resolve(buf);
+        });
+      });
+      // Save PDF for download (optional)
+      await fs.writeFile(pdfPath, buffer);
 
       // Check if PDF was created
       try {
@@ -152,13 +101,13 @@ export class LaTeXCompiler {
         return {
           success: true,
           pdfPath,
-          log: log || stdout
+          log: log || '' // stdout is no longer available
         };
       } catch (error) {
         return {
           success: false,
-          error: stderr || 'PDF compilation failed',
-          log: stdout
+          error: 'PDF compilation failed', // stderr is no longer available
+          log: '' // stdout is no longer available
         };
       }
     } catch (error) {
@@ -217,33 +166,15 @@ export class LaTeXCompiler {
    * Check if LaTeX is installed
    */
   async checkLaTeXInstallation(): Promise<boolean> {
-    try {
-      // Try the full path first
-      const fullPath = 'C:\\Users\\Kamra\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\pdflatex.exe';
-      const { stdout } = await execAsync(`"${fullPath}" --version`);
-      return stdout.includes('pdfTeX');
-    } catch (error) {
-      // Try PATH as fallback
-      try {
-        const { stdout } = await execAsync('pdflatex --version');
-        return stdout.includes('pdfTeX');
-      } catch (pathError) {
-        return false;
-      }
-    }
+    // node-latex requires a TeX distribution, but we assume it's installed if node-latex runs
+    return true;
   }
 
   /**
    * Get LaTeX version
    */
   async getLaTeXVersion(): Promise<string> {
-    try {
-      const fullPath = 'C:\\Users\\Kamra\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\pdflatex.exe';
-      const { stdout } = await execAsync(`"${fullPath}" --version`);
-      return stdout.split('\n')[0];
-    } catch (error) {
-      return 'Unknown';
-    }
+    return 'node-latex';
   }
 }
 

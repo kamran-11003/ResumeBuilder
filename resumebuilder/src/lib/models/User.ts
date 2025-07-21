@@ -146,6 +146,19 @@ interface ResumeTemplate {
   createdAt: Date;
 }
 
+// Interface for OAuth Accounts
+interface OAuthAccount {
+  provider: string;
+  providerAccountId: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  tokenType?: string;
+  scope?: string;
+  idToken?: string;
+  sessionState?: string;
+}
+
 // Main User Interface
 export interface IUser extends Document {
   // Authentication
@@ -153,19 +166,7 @@ export interface IUser extends Document {
   name: string;
   image?: string;
   emailVerified?: Date;
-  
-  // OAuth Providers
-  accounts: {
-    provider: string;
-    providerAccountId: string;
-    refresh_token?: string;
-    access_token?: string;
-    expires_at?: number;
-    token_type?: string;
-    scope?: string;
-    id_token?: string;
-    session_state?: string;
-  }[];
+  oauthAccounts: OAuthAccount[];
   
   // Personal Information
   personalInfo: {
@@ -467,6 +468,18 @@ const AnalyticsSchema = new Schema({
   favoriteTemplates: [String],
 });
 
+const OAuthAccountSchema = new Schema<OAuthAccount>({
+  provider: { type: String, required: true },
+  providerAccountId: { type: String, required: true },
+  accessToken: String,
+  refreshToken: String,
+  expiresAt: Number,
+  tokenType: String,
+  scope: String,
+  idToken: String,
+  sessionState: String,
+});
+
 // Main User Schema
 const UserSchema = new Schema<IUser>({
   // Authentication
@@ -474,19 +487,7 @@ const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
   image: String,
   emailVerified: Date,
-  
-  // OAuth Accounts
-  accounts: [{
-    provider: String,
-    providerAccountId: String,
-    refresh_token: String,
-    access_token: String,
-    expires_at: Number,
-    token_type: String,
-    scope: String,
-    id_token: String,
-    session_state: String,
-  }],
+  oauthAccounts: [OAuthAccountSchema],
   
   // Personal Information
   personalInfo: {
@@ -534,7 +535,6 @@ const UserSchema = new Schema<IUser>({
 });
 
 // Indexes for better query performance
-UserSchema.index({ email: 1 });
 UserSchema.index({ 'personalInfo.firstName': 1, 'personalInfo.lastName': 1 });
 UserSchema.index({ 'skills.name': 1 });
 UserSchema.index({ 'workExperience.company': 1 });

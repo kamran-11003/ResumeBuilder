@@ -115,29 +115,6 @@ export default function MyResumes() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center">
-              <FileText className="w-8 h-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">ResumeBuilder</span>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/build-resume" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Build Resume
-              </Link>
-              <Link href="/ats-checker" className="text-gray-600 hover:text-blue-600 transition-colors">
-                ATS Checker
-              </Link>
-              <Link href="/auth/signin" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Login
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

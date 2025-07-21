@@ -17,6 +17,8 @@ import {
   Shield
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 // Register GSAP plugins
 if (typeof window !== 'undefined') {
@@ -27,6 +29,33 @@ export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   const testimonialsRef = useRef<HTMLDivElement>(null);
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // Check profile completeness (mock: check if firstName and email exist)
+  const isProfileComplete = session?.user?.name && session?.user?.email; // Replace with real profile check if available
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      // If profile is incomplete, redirect to profile page
+      if (!isProfileComplete) {
+        router.replace('/profile');
+      } else {
+        router.replace('/dashboard');
+      }
+    }
+  }, [status, isProfileComplete, router]);
+
+  // Handler for protected actions
+  const requireLogin = (action: () => void) => {
+    if (status !== 'authenticated') {
+      router.push('/auth/signin');
+    } else if (!isProfileComplete) {
+      router.push('/profile');
+    } else {
+      action();
+    }
+  };
 
   useEffect(() => {
     // Hero animation
@@ -162,9 +191,7 @@ return (
               <span className="ml-2 text-xl font-bold text-gray-900">ResumeBuilder</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
-              <Link href="/profile" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Profile
-              </Link>
+              {/* Remove Profile and My Resumes links */}
               <Link href="/ats-checker" className="text-gray-600 hover:text-blue-600 transition-colors">
                 ATS Checker
               </Link>
@@ -173,9 +200,6 @@ return (
               </Link>
               <Link href="/build-resume" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Build Resume
-              </Link>
-              <Link href="/my-resumes" className="text-gray-600 hover:text-blue-600 transition-colors">
-                My Resumes
               </Link>
               <Link href="/auth/signin" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Login
@@ -220,20 +244,24 @@ return (
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
           >
-            <Link 
-              href="/build-resume-ai"
-              className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+            <button
+              onClick={() => requireLogin(() => router.push('/build-resume-ai'))}
+              className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              disabled={status === 'loading'}
+              title={status === 'loading' ? 'Checking authentication...' : ''}
             >
               Start Building with AI
               <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link 
-              href="/ats-checker"
-              className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-lg text-lg font-semibold hover:border-blue-600 hover:text-blue-600 transition-colors flex items-center gap-2"
+            </button>
+            <button
+              onClick={() => requireLogin(() => router.push('/ats-checker'))}
+              className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-lg text-lg font-semibold hover:border-blue-600 hover:text-blue-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+              disabled={status === 'loading'}
+              title={status === 'loading' ? 'Checking authentication...' : ''}
             >
               Check ATS Score
               <Eye className="w-5 h-5" />
-            </Link>
+            </button>
           </motion.div>
         </div>
       </section>

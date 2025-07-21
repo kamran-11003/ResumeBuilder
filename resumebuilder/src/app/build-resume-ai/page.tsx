@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import TemplateSelector from '@/components/TemplateSelector';
+import dynamic from 'next/dynamic';
+import { useRef, useEffect } from 'react';
 
 interface JobDescription {
   title: string;
@@ -61,6 +63,8 @@ interface UserProfile {
   }>;
 }
 
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+
 export default function BuildResumeAI() {
   const [step, setStep] = useState(1);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
@@ -86,6 +90,96 @@ export default function BuildResumeAI() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [latexCode, setLatexCode] = useState<string>('');
+  const [compileError, setCompileError] = useState<string | null>(null);
+  const compileTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // After resume is generated, set LaTeX code
+  useEffect(() => {
+    if (step === 4 && !latexCode && pdfUrl) {
+      // Fetch the LaTeX code from the backend or from the last AI response
+      // For now, assume it's available in a variable or state (update as needed)
+      // setLatexCode(generatedLatexCode);
+    }
+  }, [step, pdfUrl]);
+
+  // Debounced compile on LaTeX code change
+  useEffect(() => {
+    if (step === 4 && latexCode) {
+      if (compileTimeout.current) clearTimeout(compileTimeout.current);
+      compileTimeout.current = setTimeout(() => {
+        compileLatex(latexCode);
+      }, 800);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latexCode]);
+
+  useEffect(() => {
+    // Fetch user profile from API on mount
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch('/api/profile');
+        if (res.ok) {
+          const data = await res.json();
+          setUserProfile({
+            name: data.name || '',
+            email: data.email || '',
+            title: data.personalInfo?.title || '',
+            summary: data.personalInfo?.summary || '',
+            skills: Array.isArray(data.skills) ? data.skills.map((s: any) => s.name || s) : [],
+            experience: Array.isArray(data.workExperience) ? data.workExperience.map((exp: any) => ({
+              company: exp.company || '',
+              position: exp.position || '',
+              startDate: exp.startDate || '',
+              endDate: exp.endDate || '',
+              description: exp.description || '',
+              achievements: Array.isArray(exp.achievements) ? exp.achievements : [],
+            })) : [],
+            education: Array.isArray(data.education) ? data.education.map((edu: any) => ({
+              institution: edu.institution || '',
+              degree: edu.degree || '',
+              fieldOfStudy: edu.fieldOfStudy || '',
+              startDate: edu.startDate || '',
+              endDate: edu.endDate || '',
+              gpa: edu.gpa || undefined,
+            })) : [],
+          });
+        }
+      } catch (err) {
+        // handle error
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const compileLatex = async (code: string) => {
+    setCompileError(null);
+    setIsCompiling(true);
+    try {
+      const res = await fetch('/api/ai/generate-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userProfile,
+          jobDescription,
+          additionalAnswers: answers,
+          templateId: selectedTemplateId,
+          latexOverride: code,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setCompileError(data.error || 'Failed to compile LaTeX');
+        setIsCompiling(false);
+        return;
+      }
+      const blob = await res.blob();
+      setPdfUrl(URL.createObjectURL(blob));
+    } catch (err: any) {
+      setCompileError(err.message || 'Failed to compile LaTeX');
+    }
+    setIsCompiling(false);
+  };
 
   const handleUserProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,31 +317,8 @@ export default function BuildResumeAI() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center">
-              <FileText className="w-8 h-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">ResumeBuilder</span>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/build-resume" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Manual Builder
-              </Link>
-              <Link href="/ats-checker" className="text-gray-600 hover:text-blue-600 transition-colors">
-                ATS Checker
-              </Link>
-              <Link href="/my-resumes" className="text-gray-600 hover:text-blue-600 transition-colors">
-                My Resumes
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gray-50 py-10 px-4">
+      <div className="max-w-5xl mx-auto">
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center justify-center space-x-4">
@@ -617,31 +688,40 @@ export default function BuildResumeAI() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="bg-white rounded-xl shadow-lg p-8"
+              className="bg-white rounded-xl shadow-lg p-0 flex h-[70vh]"
             >
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+              {/* Left: LaTeX Code Editor */}
+              <div className="w-1/2 h-full border-r flex flex-col">
+                <div className="p-4 border-b font-semibold">LaTeX Code Editor</div>
+                <div className="flex-1">
+                  <MonacoEditor
+                    height="100%"
+                    defaultLanguage="latex"
+                    value={latexCode}
+                    onChange={v => setLatexCode(v || '')}
+                    theme="vs-dark"
+                    options={{ fontSize: 14 }}
+                  />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  Resume Generated Successfully!
-                </h2>
-                <p className="text-gray-600">
-                  Your AI-powered resume is ready. Preview and download your professional resume.
-                </p>
+                {compileError && (
+                  <div className="p-2 text-red-600 bg-red-50 border-t border-red-200 text-xs">{compileError}</div>
+                )}
               </div>
-
-              {pdfUrl && (
-                <div className="space-y-6">
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <iframe
-                      src={pdfUrl}
-                      className="w-full h-96 border-0"
-                      title="Resume Preview"
-                    />
-                  </div>
-
-                  <div className="flex justify-center space-x-4">
+              {/* Right: PDF Preview */}
+              <div className="w-1/2 h-full flex flex-col">
+                <div className="p-4 border-b font-semibold flex items-center justify-between">
+                  PDF Preview
+                  {isCompiling && <span className="ml-2 text-xs text-blue-500">Compiling...</span>}
+                </div>
+                <div className="flex-1 flex items-center justify-center bg-gray-100">
+                  {pdfUrl ? (
+                    <iframe src={pdfUrl} className="w-full h-full border-0" title="Resume Preview" />
+                  ) : (
+                    <span className="text-gray-400">Compile your LaTeX to see the PDF preview</span>
+                  )}
+                </div>
+                <div className="p-4 border-t flex justify-center space-x-4">
+                  {pdfUrl && (
                     <a
                       href={pdfUrl}
                       download="resume.pdf"
@@ -650,16 +730,16 @@ export default function BuildResumeAI() {
                       <Download className="w-4 h-4 mr-2" />
                       Download PDF
                     </a>
-                    <button
-                      onClick={() => setStep(1)}
-                      className="flex items-center px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Create Another
-                    </button>
-                  </div>
+                  )}
+                  <button
+                    onClick={() => setStep(1)}
+                    className="flex items-center px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Create Another
+                  </button>
                 </div>
-              )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
