@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { geminiService, UserProfile, JobDescription } from '@/lib/ai/gemini';
 import { latexCompiler } from '@/lib/latex/compiler';
 import { PDFGenerator } from '@/lib/pdf/generator';
+import { Template } from '@/lib/models/Template';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,12 @@ export async function POST(request: NextRequest) {
         { error: 'User profile, job description, and template ID are required' },
         { status: 400 }
       );
+    }
+
+    // Fetch template from DB
+    const template = await Template.findById(templateId);
+    if (!template) {
+      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
 
     // Generate LaTeX code using AI
@@ -34,7 +41,11 @@ export async function POST(request: NextRequest) {
     try {
       // Try LaTeX compilation first
       console.log('🔄 Attempting LaTeX compilation...');
-      const compilationResult = await latexCompiler.compileToPDF(latexCode);
+      const compilationResult = await latexCompiler.compileToPDF(
+        latexCode,
+        undefined,
+        template.classFile ? { name: 'resume.cls', content: template.classFile } : undefined
+      );
 
       if (compilationResult.success && compilationResult.pdfPath) {
         // Get PDF buffer for download

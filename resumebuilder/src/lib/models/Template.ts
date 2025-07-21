@@ -7,6 +7,7 @@ export interface ITemplate extends Document {
   author: string;
   version: string;
   latexCode: string;
+  classFile?: string;
   previewImage?: string;
   isActive: boolean;
   isPremium: boolean;
@@ -56,6 +57,10 @@ const TemplateSchema = new Schema<ITemplate>({
   latexCode: {
     type: String,
     required: true
+  },
+  classFile: {
+    type: String,
+    required: false
   },
   previewImage: {
     type: String,

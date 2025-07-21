@@ -30,7 +30,7 @@ export class LaTeXCompiler {
   /**
    * Compile LaTeX code to PDF
    */
-  async compileToPDF(latexCode: string, filename?: string): Promise<CompilationResult> {
+  async compileToPDF(latexCode: string, filename?: string, classFile?: { name: string, content: string }): Promise<CompilationResult> {
     const id = uuidv4();
     const baseName = filename || `resume_${id}`;
     const pdfPath = path.join(this.tempDir, `${baseName}.pdf`);
@@ -38,7 +38,11 @@ export class LaTeXCompiler {
       // Write LaTeX code to file (for debugging or user download)
       const texPath = path.join(this.tempDir, `${baseName}.tex`);
       await fs.writeFile(texPath, latexCode, 'utf8');
-
+      // If a class file is provided, write it to the temp directory
+      if (classFile) {
+        const classPath = path.join(this.tempDir, classFile.name);
+        await fs.writeFile(classPath, classFile.content, 'utf8');
+      }
       // Use node-latex to compile
       const output = latex(latexCode, { inputs: [this.tempDir] });
       const buffer: Buffer = await new Promise((resolve, reject) => {
