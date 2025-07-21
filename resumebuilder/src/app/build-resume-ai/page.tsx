@@ -1,0 +1,703 @@
+'use client';
+
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  FileText, 
+  Upload, 
+  Brain, 
+  Download, 
+  Eye,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle,
+  Loader2,
+  Zap,
+  Target,
+  MessageSquare,
+  X,
+  User
+} from 'lucide-react';
+import Link from 'next/link';
+import TemplateSelector from '@/components/TemplateSelector';
+
+interface JobDescription {
+  title: string;
+  company: string;
+  description: string;
+  requirements: string[];
+  responsibilities: string[];
+}
+
+interface AIQuestion {
+  question: string;
+  input_type: 'text' | 'textarea' | 'select' | 'multiselect';
+  options?: string[];
+  required: boolean;
+  category: string;
+}
+
+interface UserProfile {
+  name: string;
+  email: string;
+  title?: string;
+  summary?: string;
+  skills: string[];
+  experience: Array<{
+    company: string;
+    position: string;
+    startDate: string;
+    endDate?: string;
+    description: string;
+    achievements: string[];
+  }>;
+  education: Array<{
+    institution: string;
+    degree: string;
+    fieldOfStudy: string;
+    startDate: string;
+    endDate?: string;
+    gpa?: number;
+  }>;
+}
+
+export default function BuildResumeAI() {
+  const [step, setStep] = useState(1);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [jobDescription, setJobDescription] = useState<JobDescription>({
+    title: '',
+    company: '',
+    description: '',
+    requirements: [],
+    responsibilities: []
+  });
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    name: '',
+    email: '',
+    title: '',
+    summary: '',
+    skills: [],
+    experience: [],
+    education: []
+  });
+  const [questions, setQuestions] = useState<AIQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  const handleUserProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userProfile.name || !userProfile.email) return;
+    setStep(2);
+  };
+
+  const handleJobDescriptionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!jobDescription.title || !jobDescription.company || !jobDescription.description) return;
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/ai/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userProfile, jobDescription })
+      });
+
+      if (!response.ok) throw new Error('Failed to generate questions');
+
+      const data = await response.json();
+      setQuestions(data.questions);
+      setStep(3);
+    } catch (error) {
+      console.error('Error generating questions:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleAnswersSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!jobDescription.title || !jobDescription.company || !jobDescription.description) return;
+
+    setIsCompiling(true);
+    try {
+      const response = await fetch('/api/ai/generate-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userProfile,
+          jobDescription,
+          additionalAnswers: answers,
+          templateId: selectedTemplateId
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to generate resume');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      setStep(4);
+    } catch (error) {
+      console.error('Error generating resume:', error);
+    } finally {
+      setIsCompiling(false);
+    }
+  };
+
+  const handleInputChange = (questionIndex: number, value: string) => {
+    setAnswers(prev => ({
+      ...prev,
+      [questionIndex.toString()]: value
+    }));
+  };
+
+  const renderQuestion = (question: AIQuestion, index: number) => {
+    const value = answers[index.toString()] || '';
+
+    switch (question.input_type) {
+      case 'textarea':
+        return (
+          <textarea
+            value={value}
+            onChange={(e) => handleInputChange(index, e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            rows={4}
+            placeholder="Enter your answer..."
+            required={question.required}
+          />
+        );
+
+      case 'select':
+        return (
+          <select
+            value={value}
+            onChange={(e) => handleInputChange(index, e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required={question.required}
+          >
+            <option value="">Select an option...</option>
+            {question.options?.map((option, i) => (
+              <option key={i} value={option}>{option}</option>
+            ))}
+          </select>
+        );
+
+      case 'multiselect':
+        const selectedValues = value ? value.split(',') : [];
+        return (
+          <div className="space-y-2">
+            {question.options?.map((option, i) => (
+              <label key={i} className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={selectedValues.includes(option)}
+                  onChange={(e) => {
+                    const newValues = e.target.checked
+                      ? [...selectedValues, option]
+                      : selectedValues.filter(v => v !== option);
+                    handleInputChange(index, newValues.join(','));
+                  }}
+                  className="mr-2"
+                />
+                {option}
+              </label>
+            ))}
+          </div>
+        );
+
+      default:
+        return (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleInputChange(index, e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter your answer..."
+            required={question.required}
+          />
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Navigation */}
+      <nav className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <Link href="/" className="flex items-center">
+              <FileText className="w-8 h-8 text-blue-600" />
+              <span className="ml-2 text-xl font-bold text-gray-900">ResumeBuilder</span>
+            </Link>
+            <div className="flex items-center space-x-4">
+              <Link href="/build-resume" className="text-gray-600 hover:text-blue-600 transition-colors">
+                Manual Builder
+              </Link>
+              <Link href="/ats-checker" className="text-gray-600 hover:text-blue-600 transition-colors">
+                ATS Checker
+              </Link>
+              <Link href="/my-resumes" className="text-gray-600 hover:text-blue-600 transition-colors">
+                My Resumes
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Progress Steps */}
+        <div className="mb-8">
+          <div className="flex items-center justify-center space-x-4">
+            {[1, 2, 3, 4].map((stepNumber) => (
+              <div key={stepNumber} className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= stepNumber 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {step > stepNumber ? <CheckCircle className="w-4 h-4" /> : stepNumber}
+                </div>
+                {stepNumber < 4 && (
+                  <div className={`w-16 h-1 mx-2 ${
+                    step > stepNumber ? 'bg-blue-600' : 'bg-gray-200'
+                  }`} />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-center mt-4 space-x-6">
+            <span className={`text-sm ${step >= 1 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+              Profile
+            </span>
+            <span className={`text-sm ${step >= 2 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+              Job Description
+            </span>
+            <span className={`text-sm ${step >= 3 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+              AI Questions
+            </span>
+            <span className={`text-sm ${step >= 4 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+              Generate Resume
+            </span>
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div
+              key="step1"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white rounded-xl shadow-lg p-8"
+            >
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <User className="w-8 h-8 text-blue-600" />
+                </div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  Your Profile
+                </h1>
+                <p className="text-gray-600">
+                  Let's start by collecting your basic information
+                </p>
+              </div>
+
+              <form onSubmit={handleUserProfileSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={userProfile.name}
+                      onChange={(e) => setUserProfile(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="John Doe"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={userProfile.email}
+                      onChange={(e) => setUserProfile(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="john@example.com"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Professional Title
+                  </label>
+                  <input
+                    type="text"
+                    value={userProfile.title || ''}
+                    onChange={(e) => setUserProfile(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Senior Software Engineer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Professional Summary
+                  </label>
+                  <textarea
+                    value={userProfile.summary || ''}
+                    onChange={(e) => setUserProfile(prev => ({ ...prev, summary: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    rows={4}
+                    placeholder="Brief summary of your professional background and key strengths..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Key Skills (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={userProfile.skills.join(', ')}
+                    onChange={(e) => setUserProfile(prev => ({ 
+                      ...prev, 
+                      skills: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="JavaScript, React, Node.js, Python, AWS"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!userProfile.name || !userProfile.email}
+                  className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Continue to Job Description
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </button>
+              </form>
+            </motion.div>
+          )}
+
+          {step === 2 && (
+            <motion.div
+              key="step2"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white rounded-xl shadow-lg p-8"
+            >
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Target className="w-8 h-8 text-blue-600" />
+                </div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  Job Description
+                </h1>
+                <p className="text-gray-600">
+                  Enter the job details to help AI generate targeted questions
+                </p>
+              </div>
+
+              <form onSubmit={handleJobDescriptionSubmit} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Job Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={jobDescription.title}
+                    onChange={(e) => setJobDescription(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Senior Software Engineer"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company *
+                  </label>
+                  <input
+                    type="text"
+                    value={jobDescription.company}
+                    onChange={(e) => setJobDescription(prev => ({ ...prev, company: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Google"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Job Description *
+                  </label>
+                  <textarea
+                    value={jobDescription.description}
+                    onChange={(e) => setJobDescription(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    rows={6}
+                    placeholder="Paste the full job description here..."
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Key Requirements
+                    </label>
+                    <textarea
+                      value={jobDescription.requirements.join('\n')}
+                      onChange={(e) => setJobDescription(prev => ({ 
+                        ...prev, 
+                        requirements: e.target.value.split('\n').filter(r => r.trim()) 
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      rows={4}
+                      placeholder="Enter key requirements (one per line)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Key Responsibilities
+                    </label>
+                    <textarea
+                      value={jobDescription.responsibilities.join('\n')}
+                      onChange={(e) => setJobDescription(prev => ({ 
+                        ...prev, 
+                        responsibilities: e.target.value.split('\n').filter(r => r.trim()) 
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      rows={4}
+                      placeholder="Enter key responsibilities (one per line)"
+                    />
+                  </div>
+                </div>
+
+                {/* Template Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Resume Template
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplateSelector(true)}
+                    className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left"
+                  >
+                    {selectedTemplateId ? (
+                      <span className="text-blue-600 font-medium">Template selected ✓</span>
+                    ) : (
+                      <span className="text-gray-500">Click to select a template</span>
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isGenerating || !jobDescription.title || !jobDescription.company || !jobDescription.description}
+                    className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating Questions...
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="w-4 h-4 mr-2" />
+                        Generate AI Questions
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+
+          {step === 3 && (
+            <motion.div
+              key="step3"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white rounded-xl shadow-lg p-8"
+            >
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-8 h-8 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  AI-Generated Questions
+                </h2>
+                <p className="text-gray-600">
+                  Answer these targeted questions to help AI create your perfect resume
+                </p>
+              </div>
+
+              <form onSubmit={handleAnswersSubmit} className="space-y-6">
+                {questions.map((question, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-6">
+                    <label className="block text-sm font-medium text-gray-900 mb-3">
+                      {question.question}
+                      {question.required && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    {renderQuestion(question, index)}
+                    <div className="mt-2">
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        {question.category}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isCompiling}
+                    className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isCompiling ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating Resume...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Generate Resume
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+
+          {step === 4 && (
+            <motion.div
+              key="step4"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white rounded-xl shadow-lg p-8"
+            >
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  Resume Generated Successfully!
+                </h2>
+                <p className="text-gray-600">
+                  Your AI-powered resume is ready. Preview and download your professional resume.
+                </p>
+              </div>
+
+              {pdfUrl && (
+                <div className="space-y-6">
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <iframe
+                      src={pdfUrl}
+                      className="w-full h-96 border-0"
+                      title="Resume Preview"
+                    />
+                  </div>
+
+                  <div className="flex justify-center space-x-4">
+                    <a
+                      href={pdfUrl}
+                      download="resume.pdf"
+                      className="flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download PDF
+                    </a>
+                    <button
+                      onClick={() => setStep(1)}
+                      className="flex items-center px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Create Another
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Template Selector Modal */}
+        {showTemplateSelector && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+            >
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-gray-900">Select Resume Template</h2>
+                  <button
+                    onClick={() => setShowTemplateSelector(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <TemplateSelector
+                  selectedTemplateId={selectedTemplateId}
+                  onTemplateSelect={(templateId) => {
+                    setSelectedTemplateId(templateId);
+                    setShowTemplateSelector(false);
+                  }}
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+} 

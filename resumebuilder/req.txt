@@ -1,0 +1,433 @@
+Excellent — let’s capture your vision into a well-structured project blueprint for your AI-powered resume builder website. I’ll provide a precise outline of:
+
+✅ Full Website Architecture & Workflow
+✅ Tech Stack Recommendation
+✅ AI Integration Details (Gemini / structured prompts)
+✅ Frontend Page Plan
+✅ System Data Flows
+✅ Key Components & User Experience
+
+Below is a concise design document you can use as a reference to start your project.
+
+🚀 AI Resume Builder – Project Blueprint
+🎯 Website Workflow Overview
+Landing Page
+
+Animated sections explaining features
+
+Built with GSAP + ScrollTrigger for smooth scroll effects
+
+Nav bar:
+
+Login
+
+Signup
+
+ATS Checker
+
+Build Resume
+
+My Resumes
+
+Authentication
+
+OAuth login via:
+
+Google
+
+GitHub
+
+LinkedIn
+
+If user logs in via LinkedIn:
+
+Pull basic info:
+
+Name
+
+Current role
+
+Experience
+
+Skills
+
+Otherwise:
+
+User can enter details manually
+
+Build Resume Page
+
+User selects a LaTeX resume template
+
+Modal/popup asks user to:
+
+Paste job description
+
+System sends:
+
+Job description
+
+User profile data
+
+Template context
+→ to Gemini AI
+
+Gemini returns:
+
+JSON:
+
+json
+Copy
+Edit
+{
+  "questions": [
+    {
+      "question": "Describe a major achievement relevant to this job.",
+      "input_type": "textarea"
+    },
+    ...
+  ]
+}
+Frontend displays this dynamic questionnaire
+
+User fills out answers
+
+AI-Driven LaTeX Generation
+
+All gathered data (user info + answers + job description) is sent back to Gemini with structured prompting:
+
+Request for LaTeX resume code matching selected template
+
+Gemini returns:
+
+Pure LaTeX code
+
+Backend compiles LaTeX → PDF
+
+User sees:
+
+PDF preview
+
+Live “compile” animation or progress bar
+
+Option to download PDF
+
+Selective Editing with AI
+
+On preview screen:
+
+User can click any resume section
+
+Send section text + context to Gemini:
+
+E.g. “Make this section more concise” or “Rewrite with more technical terms”
+
+Gemini returns revised LaTeX snippet
+
+Replace snippet in the document
+
+Cover Letter Generation
+
+User proceeds to Cover Letter page
+
+System sends:
+
+Job description
+
+User’s finalized resume details
+
+User’s preferred tone (formal, enthusiastic, etc.)
+→ to Gemini
+
+Gemini returns LaTeX code for cover letter
+
+Compile & show cover letter PDF preview
+
+ATS Checker
+
+Analyze:
+
+Job description
+
+Final resume text
+
+Show:
+
+Keyword match percentage
+
+Missing keywords
+
+Improvement suggestions
+
+Profile & Data Storage
+
+Save:
+
+User profile updates
+
+All generated resumes
+
+Cover letters
+
+Users can:
+
+Reuse past resumes
+
+Edit existing resumes
+
+Download previous documents
+
+🛠️ Recommended Tech Stack
+Frontend
+✅ React / Next.js
+✅ TailwindCSS
+✅ GSAP + ScrollTrigger (for animations)
+✅ ShadCN UI or Material UI for components
+
+Backend
+✅ Node.js (Express) or FastAPI (Python)
+✅ OAuth integration (Google, GitHub, LinkedIn)
+✅ LaTeX compilation:
+
+Use pdflatex or tectonic on backend
+✅ Storage:
+
+AWS S3 for PDFs
+
+PostgreSQL for user & resume data
+
+AI Integration
+✅ Gemini API (or equivalent LLM)
+
+Use structured JSON prompts & responses
+✅ Future consideration: LLaMA 3 (via Ollama/OpenRouter)
+
+📄 Frontend Pages & Features
+1. Landing Page
+Hero animation (GSAP)
+
+Scroll-triggered features display
+
+Call-to-action buttons
+
+2. Login / Sign Up
+OAuth login UI
+
+Manual signup option
+
+3. Dashboard
+User profile info
+
+My Resumes list
+
+Quick links to:
+
+Build Resume
+
+ATS Checker
+
+4. Build Resume
+Template selection grid
+
+Upload/enter job description modal
+
+Dynamic question form rendered from Gemini JSON
+
+PDF preview screen
+
+Section-wise AI edit option
+
+5. Cover Letter Generator
+Form to choose tone
+
+PDF preview of generated letter
+
+6. ATS Checker
+Upload resume
+
+Paste job description
+
+ATS match analysis report
+
+7. My Resumes
+List of past resumes
+
+Options to:
+
+View
+
+Edit
+
+Regenerate
+
+Download
+
+🔗 System Data Flow
+csharp
+Copy
+Edit
+[User] 
+   ↓
+[Frontend (Job Description, Template Selection)]
+   ↓
+[Gemini AI → JSON with Questions]
+   ↓
+[User Inputs Answers]
+   ↓
+[Gemini AI → LaTeX Resume Code]
+   ↓
+[Backend → LaTeX Compiler → PDF]
+   ↓
+[Frontend PDF Preview]
+   ↓
+[Cover Letter Generation (AI)]
+   ↓
+[ATS Checker]
+   ↓
+[Profile Update & Storage]
+🤖 Sample Gemini Prompts
+Step 1 — Generate Questions
+vbnet
+Copy
+Edit
+Prompt:
+“User profile:
+- Name: John Doe
+- Skills: Python, AI, Data Science
+- Experience: 3 years as Data Analyst
+
+Job Description:
+<insert job description text>
+
+Please analyze the user profile vs job description and produce:
+- A JSON array of 5–10 questions to collect missing information relevant for resume writing.
+Each question should include:
+- question text
+- input_type (text, textarea, select, multiselect)
+”
+Step 2 — Generate LaTeX Resume
+sql
+Copy
+Edit
+Prompt:
+“Based on the following:
+- User’s full profile
+- Job description
+- User’s additional answers
+
+Please generate LaTeX code for the selected resume template. Return only LaTeX code in your response.”
+💲 Monetization Options
+Freemium plan:
+
+Limited resumes/month
+
+Limited ATS scans
+
+Paid tiers:
+
+Unlimited resumes
+
+Premium templates
+
+Advanced ATS insights
+
+Auto-apply bot (future feature)
+
+Corporate accounts for career services
+
+⭐ Future Features
+✅ Auto-apply to job portals using stored resume & cover letter
+✅ AI-based resume feedback (like recruiter feedback)
+✅ Chrome extension for scraping job postings directly
+✅ Interview question simulator
+
+This covers your concept end-to-end. Let me know:
+
+Do you want this as a Markdown file or a tech spec document?
+
+Would you like wireframes/mockups for the pages?
+
+Should I help design API contracts (e.g. JSON shapes for AI responses)?
+
+Let’s make this a reality!
+
+
+
+
+
+
+
+You said:
+liberary for latex compiler in js
+
+
+ChatGPT said:
+To compile LaTeX directly in JavaScript (browser or server), here are the best options based on where you want the LaTeX to be compiled:
+
+✅ 1. Browser-based LaTeX Compiler Libraries
+1. LaTeX.js
+📍 Where: Runs entirely in the browser (client-side).
+
+📄 Output: HTML (not PDF).
+
+🛠️ Use case: Good for live preview of LaTeX in browser.
+
+⚠️ Limitation: Doesn’t produce PDFs.
+
+bash
+Copy
+Edit
+npm install latex.js
+js
+Copy
+Edit
+import latex from 'latex.js';
+const generator = new latex.HtmlGenerator({ hyphenate: false });
+const doc = latex.parse(latexCode, { generator });
+document.body.appendChild(doc.domFragment);
+2. KaTeX or MathJax
+📍 Where: Browser
+
+🎯 Use case: Only for rendering math equations, not full documents.
+
+⚠️ Limitation: Not suitable for compiling full LaTeX resumes.
+
+✅ 2. Node.js Server-side LaTeX Compilation
+1. node-latex
+📍 Where: Node.js server
+
+📄 Output: PDF
+
+🛠️ Use case: Converts .tex code into .pdf via pdflatex (requires it installed)
+
+✅ Best for your resume builder
+
+bash
+Copy
+Edit
+npm install node-latex
+js
+Copy
+Edit
+const fs = require('fs');
+const latex = require('node-latex');
+const input = '...your LaTeX code...';
+const output = fs.createWriteStream('resume.pdf');
+
+const pdf = latex(input);
+pdf.pipe(output);
+pdf.on('error', err => console.error(err));
+pdf.on('finish', () => console.log('PDF generated!'));
+🔧 Make sure you have pdflatex (from TeX Live, MikTeX, etc.) installed on the server.
+
+2. Spawn pdflatex via child_process
+If you want more control:
+
+js
+Copy
+Edit
+const { exec } = require('child_process');
+exec('pdflatex resume.tex', (err, stdout, stderr) => {
+  if (err) return console.error(`Error: ${err}`);
+  console.log('Resume compiled!');
+});
