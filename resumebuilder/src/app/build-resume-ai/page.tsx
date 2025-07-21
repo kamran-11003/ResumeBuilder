@@ -193,15 +193,18 @@ export default function BuildResumeAI() {
 
     setIsGenerating(true);
     try {
+      const requestBody = { userProfile, jobDescription };
+      console.log('🔎 [Generate Questions] Prompt:', requestBody);
       const response = await fetch('/api/ai/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userProfile, jobDescription })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) throw new Error('Failed to generate questions');
 
       const data = await response.json();
+      console.log('🧠 [Generate Questions] Response:', data.questions);
       setQuestions(data.questions);
       setStep(3);
     } catch (error) {
