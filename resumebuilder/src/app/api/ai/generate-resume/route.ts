@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { geminiService, UserProfile, JobDescription } from '@/lib/ai/gemini';
 import { latexCompiler } from '@/lib/latex/compiler';
 import { PDFGenerator } from '@/lib/pdf/generator';
+import dbConnect from '@/lib/db';
 import { Template } from '@/lib/models/Template';
 
 export async function POST(request: NextRequest) {
@@ -16,7 +17,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch template from DB
+    // Fetch template (get both latexCode and classFile)
+    await dbConnect();
     const template = await Template.findById(templateId);
     if (!template) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
@@ -27,7 +29,8 @@ export async function POST(request: NextRequest) {
       userProfile,
       jobDescription,
       additionalAnswers || {},
-      templateId
+      templateId,
+      template.latexCode
     );
 
     // Display LaTeX code in console for debugging
@@ -41,11 +44,7 @@ export async function POST(request: NextRequest) {
     try {
       // Try LaTeX compilation first
       console.log('🔄 Attempting LaTeX compilation...');
-      const compilationResult = await latexCompiler.compileToPDF(
-        latexCode,
-        undefined,
-        template.classFile ? { name: 'resume.cls', content: template.classFile } : undefined
-      );
+      const compilationResult = await latexCompiler.compileToPDF(latexCode, undefined, template.classFile);
 
       if (compilationResult.success && compilationResult.pdfPath) {
         // Get PDF buffer for download
@@ -59,7 +58,6 @@ export async function POST(request: NextRequest) {
       }
     } catch (latexError) {
       console.log('🔄 LaTeX compilation failed, using HTML fallback:', latexError);
-      
       try {
         // Fallback to HTML-to-PDF generation
         console.log('🔄 Converting LaTeX to HTML...');
@@ -68,7 +66,6 @@ export async function POST(request: NextRequest) {
         console.log('='.repeat(80));
         console.log(htmlContent.substring(0, 1000) + '...'); // Show first 1000 chars
         console.log('='.repeat(80));
-        
         pdfBuffer = await PDFGenerator.generateFromHTML(htmlContent);
         console.log('✅ HTML-to-PDF fallback successful');
       } catch (htmlError) {

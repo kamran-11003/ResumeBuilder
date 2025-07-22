@@ -1,6 +1,7 @@
 import latex from 'node-latex';
 import streamToBuffer from 'stream-to-buffer';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -30,39 +31,52 @@ export class LaTeXCompiler {
   /**
    * Compile LaTeX code to PDF
    */
-  async compileToPDF(latexCode: string, filename?: string, classFile?: { name: string, content: string }): Promise<CompilationResult> {
+  async compileToPDF(latexCode: string, filename?: string, classFile?: string): Promise<CompilationResult> {
     const id = uuidv4();
+    const compileDir = path.join(process.cwd(), 'temp', 'latex', id);
+    await fs.mkdir(compileDir, { recursive: true });
     const baseName = filename || `resume_${id}`;
-    const pdfPath = path.join(this.tempDir, `${baseName}.pdf`);
+    const texPath = path.join(compileDir, `${baseName}.tex`);
+    const pdfPath = path.join(compileDir, `${baseName}.pdf`);
     try {
-      // Write LaTeX code to file (for debugging or user download)
-      const texPath = path.join(this.tempDir, `${baseName}.tex`);
+      // Write LaTeX code to file
       await fs.writeFile(texPath, latexCode, 'utf8');
-      // If a class file is provided, write it to the temp directory
+      // If classFile is provided, write it as resume.cls
       if (classFile) {
-        const classPath = path.join(this.tempDir, classFile.name);
-        await fs.writeFile(classPath, classFile.content, 'utf8');
+        const clsPath = path.join(compileDir, 'resume.cls');
+        await fs.writeFile(clsPath, classFile, 'utf8');
       }
       // Use node-latex to compile
-      const output = latex(latexCode, { inputs: [this.tempDir] });
+      const input = fsSync.createReadStream(texPath);
+      const output = latex(input, { inputs: [compileDir] });
       const buffer: Buffer = await new Promise((resolve, reject) => {
         streamToBuffer(output, (err: Error | null, buf: Buffer) => {
           if (err) reject(err);
           else resolve(buf);
         });
       });
-      // Save PDF for download (optional)
+      // Save PDF for download
       await fs.writeFile(pdfPath, buffer);
-      return {
-        success: true,
-        pdfPath,
-      };
+        return {
+          success: true,
+          pdfPath,
+        };
     } catch (error: any) {
       return {
         success: false,
         error: error.message || 'Unknown LaTeX compilation error',
         log: error.stack || '',
       };
+    } finally {
+      // Clean up temporary files (except PDF)
+      try {
+        const files = await fs.readdir(compileDir);
+        for (const file of files) {
+          if (!file.endsWith('.pdf')) {
+            await fs.unlink(path.join(compileDir, file));
+          }
+        }
+      } catch (e) {}
     }
   }
 

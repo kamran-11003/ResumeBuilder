@@ -1,13 +1,10 @@
 import dbConnect from '../db';
 import { Template } from '../models/Template';
+import fs from 'fs';
+import path from 'path';
 
-const mainTex = `
-% PASTE THE FULL main.tex CONTENT PROVIDED BY THE USER HERE
-`;
-
-const resumeCls = `
-% PASTE THE FULL resume.cls CONTENT PROVIDED BY THE USER HERE
-`;
+const mainTex = fs.readFileSync(path.join(process.cwd(), 'templates', 'main.tex'), 'utf8');
+const resumeCls = fs.readFileSync(path.join(process.cwd(), 'templates', 'resume.cls'), 'utf8');
 
 export async function seedTemplates() {
   try {

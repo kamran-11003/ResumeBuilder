@@ -88,8 +88,8 @@ Return ONLY a valid JSON array of questions as described above.`;
     return JSON.parse(jsonMatch[0]);
   }
 
-  async generateResume(userProfile: UserProfile, jobDescription: JobDescription, additionalAnswers: Record<string, string>, templateId: string): Promise<string> {
-    const prompt = `You are an expert LaTeX resume writer. Generate professional LaTeX code for a resume based on the following information.\n\nUser Profile:\n${JSON.stringify(userProfile, null, 2)}\n\nJob Description:\n${JSON.stringify(jobDescription, null, 2)}\n\nAdditional Answers:\n${JSON.stringify(additionalAnswers, null, 2)}\n\nRequirements:\n1. Use a clean, modern LaTeX template.\n2. Replace placeholder content with user data.\n3. Tailor content to the job description.\n4. Include quantifiable achievements.\n5. Use action verbs and industry-specific keywords.\n6. Ensure proper LaTeX syntax.\n7. Return ONLY the LaTeX code, no explanations.\n8. Use ONLY these packages: inputenc, fontenc, geometry, hyperref, xcolor, titlesec, enumitem.\n9. DO NOT use fontawesome, tikz, or other complex packages.\n10. Keep the document simple and professional.\n\nReturn the complete LaTeX document code:`;
+  async generateResume(userProfile: UserProfile, jobDescription: JobDescription, additionalAnswers: Record<string, string>, templateId: string, templateLatex: string): Promise<string> {
+    const prompt = `You are an expert LaTeX resume writer. You are given a LaTeX resume template below. Your job is to ONLY update the data fields (such as name, contact info, summary, skills, experience, education, certifications, and projects) with the information provided. DO NOT change the structure, formatting, or LaTeX commands of the template. DO NOT add or remove sections. Keep all LaTeX syntax, commands, and formatting exactly as in the template. Only update the content between the curly braces or inside the environments to reflect the user data and job description.\n\nLaTeX Template:\n${templateLatex}\n\nUser Profile:\n${JSON.stringify(userProfile, null, 2)}\n\nJob Description:\n${JSON.stringify(jobDescription, null, 2)}\n\nAdditional Answers:\n${JSON.stringify(additionalAnswers, null, 2)}\n\nRequirements:\n1. Only update the data fields in the template.\n2. Do NOT change the LaTeX structure, commands, or formatting.\n3. Tailor the content to the job description.\n4. Include quantifiable achievements and action verbs.\n5. Return ONLY the updated LaTeX code, no explanations.`;
     const response = await fetch(this.apiUrl, {
       method: 'POST',
       headers: {
@@ -126,9 +126,9 @@ Return ONLY a valid JSON array of questions as described above.`;
     if (!response.ok) throw new Error('Cohere API error');
     const data = await response.json();
     const text = data.text || data.message || '';
-    const latexMatch = text.match(/\\documentclass[\s\S]*\\end\{document\}/);
+      const latexMatch = text.match(/\\documentclass[\s\S]*\\end\{document\}/);
     if (!latexMatch) throw new Error('Invalid LaTeX response from Cohere');
-    return latexMatch[0];
+      return latexMatch[0];
   }
 
   async analyzeATS(resumeText: string, jobDescription: JobDescription): Promise<{
@@ -152,9 +152,9 @@ Return ONLY a valid JSON array of questions as described above.`;
     if (!response.ok) throw new Error('Cohere API error');
     const data = await response.json();
     const text = data.text || data.message || '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Invalid JSON response from Cohere');
-    return JSON.parse(jsonMatch[0]);
+      return JSON.parse(jsonMatch[0]);
   }
 
   async editSection(sectionText: string, instruction: string, context: string): Promise<string> {
